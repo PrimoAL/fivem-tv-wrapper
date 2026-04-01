@@ -3,49 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>Astro TV</title>
-    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
-        #videoframe { width: 100%; height: 100%; pointer-events: none; border: none; }
+        iframe { width: 100%; height: 100%; border: none; pointer-events: none; }
     </style>
 </head>
 <body>
-    <div id="videoframe"></div>
+    <iframe id="yt-player" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
     <script>
-        var videohandler = null;
         const urlParams = new URLSearchParams(window.location.search);
         const videoId = urlParams.get('v');
 
-        function onYouTubeIframeAPIReady() {
-            if (videoId) {
-                videohandler = new YT.Player("videoframe", {
-                    videoId: videoId,
-                    playerVars: {
-                        'autoplay': 1,
-                        'controls': 0,
-                        'disablekb': 1,
-                        'fs': 0,
-                        'rel': 0,
-                        'modestbranding': 1,
-                        'iv_load_policy': 3
-                    },
-                    events: {
-                        'onReady': function(event) {
-                            event.target.setVolume(50); 
-                            event.target.playVideo();
-                        }
-                    }
-                });
-            }
+        if (videoId) {
+            document.getElementById('yt-player').src = `https://inv.tux.pizza/embed/${videoId}?autoplay=1&loop=1`;
         }
-
-        window.addEventListener('message', function (event) {
-            var item = event.data;
-            if (item.message === "updatevolume" && videohandler && typeof videohandler.setVolume === 'function') {
-                videohandler.setVolume(item.videovolume);
-            }
-        });
     </script>
 </body>
 </html>
