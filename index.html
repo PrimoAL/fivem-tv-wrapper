@@ -2,21 +2,73 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Astro TV Player</title>
+    <title>Astro TV</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
-        iframe { width: 100%; height: 100%; border: none; }
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: black; 
+            overflow: hidden; 
+        }
+        video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover;
+            pointer-events: none;
+        }
+        #loading {
+            color: white;
+            font-family: sans-serif;
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            text-align: center;
+            margin-top: -10px;
+        }
     </style>
 </head>
 <body>
-    <iframe id="yt-player" src="" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <div id="loading">Lade Videostream...</div>
+    
+    <video id="custom-player" autoplay loop></video>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const videoId = urlParams.get('v');
+        const videoEl = document.getElementById('custom-player');
+        const loadingEl = document.getElementById('loading');
 
         if (videoId) {
-            document.getElementById('yt-player').src = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&controls=1&disablekb=1&fs=0&rel=0&modestbranding=1&iv_load_policy=3&loop=1&playlist=${videoId}&mute=0`;
+            fetch('https://vid.puffyan.us/api/v1/videos/' + videoId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.formatStreams && data.formatStreams.length > 0) {
+                        
+                        let bestStream = data.formatStreams.find(s => s.container === 'mp4' && s.resolution === '720p');
+                        
+                        if (!bestStream) bestStream = data.formatStreams[0];
+
+                        loadingEl.style.display = 'none';
+
+                        videoEl.src = bestStream.url;
+                        
+                        videoEl.play().catch(e => {
+                            console.error("Autoplay wurde vom Browser blockiert:", e);
+                            loadingEl.textContent = "Autoplay blockiert (Ton/Mute Issue).";
+                            loadingEl.style.display = 'block';
+                        });
+                    } else {
+                        loadingEl.textContent = "Kein passender Stream gefunden.";
+                    }
+                })
+                .catch(err => {
+                    console.error("API Fehler:", err);
+                    loadingEl.textContent = "Verbindungsfehler zur API.";
+                });
+        } else {
+            loadingEl.textContent = "Keine Video-ID angegeben.";
         }
     </script>
 </body>
