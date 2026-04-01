@@ -7,90 +7,34 @@
         * { margin: 0; padding: 0; overflow: hidden; }
         html, body { width: 100%; height: 100%; background: #000; }
         iframe { width: 100%; height: 100%; border: none; }
-        #error {
-            display: none;
-            color: #fff;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            padding-top: 40vh;
-            font-size: 18px;
-        }
     </style>
 </head>
 <body>
-    <iframe id="player" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-    <div id="error">Video konnte nicht geladen werden. Bitte versuche es erneut.</div>
+    <iframe
+        id="player"
+        allow="autoplay; encrypted-media"
+        allowfullscreen
+    ></iframe>
 
     <script>
-        const params = new URLSearchParams(window.location.search);
-        const videoId = params.get('v') || '';
-        const startTime = parseInt(params.get('t')) || 0;
+        var params = new URLSearchParams(window.location.search);
+        var videoId = params.get('v') || '';
+        var startTime = params.get('t') || '0';
 
-        const instances = [
-            'https://yewtu.be',
-            'https://vid.puffyan.us',
-            'https://invidious.snopyta.org',
-            'https://inv.tux.pizza',
-            'https://invidious.io.lol'
-        ];
-
-        let currentInstance = 0;
-
-        function buildUrl(instance) {
-            return instance + '/embed/' + videoId
+        if (videoId) {
+            document.getElementById('player').src =
+                'https://www.youtube-nocookie.com/embed/' + videoId
                 + '?autoplay=1'
                 + '&controls=0'
                 + '&disablekb=1'
                 + '&fs=0'
-                + '&iv_load_policy=3'
                 + '&rel=0'
                 + '&showinfo=0'
-                + '&quality=hd720'
-                + '&t=' + startTime;
+                + '&iv_load_policy=3'
+                + '&modestbranding=1'
+                + '&playsinline=1'
+                + '&start=' + startTime;
         }
-
-        function loadPlayer() {
-            if (!videoId) {
-                document.getElementById('error').style.display = 'block';
-                document.getElementById('error').textContent = 'Keine Video-ID angegeben.';
-                return;
-            }
-
-            if (currentInstance >= instances.length) {
-                var fallbackUrl = 'https://www.youtube.com/embed/' + videoId
-                    + '?autoplay=1&controls=0&disablekb=1&fs=0&rel=0&showinfo=0&iv_load_policy=3&modestbranding=1&start=' + startTime;
-                document.getElementById('player').src = fallbackUrl;
-                console.log('[Astro TV] Alle Invidious-Instanzen down, YouTube Fallback');
-                return;
-            }
-
-            var url = buildUrl(instances[currentInstance]);
-            console.log('[Astro TV] Versuche: ' + instances[currentInstance]);
-            document.getElementById('player').src = url;
-        }
-
-        document.getElementById('player').addEventListener('error', function () {
-            console.log('[Astro TV] Instanz fehlgeschlagen: ' + instances[currentInstance]);
-            currentInstance++;
-            loadPlayer();
-        });
-
-        function checkAndRetry() {
-            setTimeout(function () {
-                try {
-                    var iframe = document.getElementById('player');
-                    if (!iframe.src || iframe.src === 'about:blank') {
-                        currentInstance++;
-                        loadPlayer();
-                    }
-                } catch (e) {
-                    // Cross-origin ignorieren
-                }
-            }, 8000);
-        }
-
-        loadPlayer();
-        checkAndRetry();
     </script>
 </body>
 </html>
