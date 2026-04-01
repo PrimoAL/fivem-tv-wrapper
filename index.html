@@ -2,38 +2,97 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>FiveM TV Wrapper</title>
+    <title>FiveM TV</title>
     <style>
         * { margin: 0; padding: 0; overflow: hidden; }
         html, body { width: 100%; height: 100%; background: #000; }
-        iframe { width: 100%; height: 100%; border: none; }
+        #player { width: 100%; height: 100%; }
     </style>
 </head>
 <body>
-    <iframe
-        id="player"
-        allow="autoplay; encrypted-media"
-        allowfullscreen
-    ></iframe>
+    <div id="player"></div>
 
     <script>
         var params = new URLSearchParams(window.location.search);
         var videoId = params.get('v') || '';
-        var startTime = params.get('t') || '0';
+        var startTime = parseInt(params.get('t')) || 0;
+        var adSkipped = false;
+        var player;
 
         if (videoId) {
-            document.getElementById('player').src =
-                'https://www.youtube-nocookie.com/embed/' + videoId
-                + '?autoplay=1'
-                + '&controls=0'
-                + '&disablekb=1'
-                + '&fs=0'
-                + '&rel=0'
-                + '&showinfo=0'
-                + '&iv_load_policy=3'
-                + '&modestbranding=1'
-                + '&playsinline=1'
-                + '&start=' + startTime;
+            var tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            var first = document.getElementsByTagName('script')[0];
+            first.parentNode.insertBefore(tag, first);
+        }
+
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                width: '100%',
+                height: '100%',
+                videoId: videoId,
+                playerVars: {
+                    autoplay: 1,
+                    controls: 0,
+                    disablekb: 1,
+                    enablejsapi: 1,
+                    fs: 0,
+                    iv_load_policy: 3,
+                    modestbranding: 1,
+                    rel: 0,
+                    showinfo: 0,
+                    playsinline: 1
+                },
+                events: {
+                    onReady: onPlayerReady,
+                    onStateChange: onPlayerStateChange,
+                    onError: onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            var duration = player.getDuration();
+            if (duration > 0) {
+                player.setVolume(0);
+                player.seekTo(duration - 0.5);
+                player.playVideo();
+                console.log('[Astro TV] Ad-Skip: Spule ans Ende (' + duration + 's)');
+            } else {
+                player.setVolume(100);
+                player.playVideo();
+                adSkipped = true;
+            }
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.ENDED && !adSkipped) {
+                adSkipped = true;
+                player.setVolume(100);
+                player.seekTo(startTime);
+                player.playVideo();
+                console.log('[Astro TV] Ad-Skip abgeschlossen, starte Video bei ' + startTime + 's');
+            }
+            
+            if (event.data === YT.PlayerState.ENDED && adSkipped) {
+                player.seekTo(0);
+                player.playVideo();
+                console.log('[Astro TV] Video Loop');
+            }
+
+            if (event.data === YT.PlayerState.PAUSED && !adSkipped) {
+                player.playVideo();
+            }
+        }
+
+        function onPlayerError(event) {
+            console.log('[Astro TV] Player Error: ' + event.data);
+            if (player) {
+                adSkipped = true;
+                player.setVolume(100);
+                player.seekTo(startTime);
+                player.playVideo();
+            }
         }
     </script>
 </body>
