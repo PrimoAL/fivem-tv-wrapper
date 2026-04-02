@@ -1,218 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TV Wrapper</title>
+    <title>Astro TV</title>
+    <script src="https://code.jquery.com/jquery-3.6.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>	
+    <script src="https://s.ytimg.com/yts/jsbin/www-widgetapi-vflJJaNgk/www-widgetapi.js"></script>
+    <script src="https://www.youtube.com/iframe_api"></script>	
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
-        #player-container { width: 100%; height: 100%; position: relative; }
-        #video-player {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: none;
-        }
-        #yt-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: none;
-        }
-        #status {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #555;
-            font-family: Arial, sans-serif;
-            font-size: 1.2em;
-            display: none;
-        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
+        #videoframe { width: 100%; height: 100%; pointer-events: none; border: none; }
     </style>
 </head>
 <body>
-    <div id="player-container">
-        <video id="video-player" autoplay playsinline></video>
-        <iframe id="yt-iframe" allow="autoplay; encrypted-media" allowfullscreen></iframe>
-        <div id="status">Kein Video</div>
-    </div>
+    <div id="videoframe"></div>
 
     <script>
-        (function() {
-            'use strict';
+        var videohandler = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoId = urlParams.get('v');
 
-            const videoPlayer = document.getElementById('video-player');
-            const ytIframe    = document.getElementById('yt-iframe');
-            const status      = document.getElementById('status');
-
-            const PIPED_INSTANCES = [
-                'https://pipedapi.kavin.rocks',
-                'https://pipedapi.adminforge.de',
-                'https://pipedapi.in.projectsegfau.lt'
-            ];
-
-            const INVIDIOUS_INSTANCES = [
-                'https://inv.nadeko.net',
-                'https://invidious.fdn.fr',
-                'https://invidious.privacyredirect.com'
-            ];
-
-            let preferredMethod = 'piped';
-            let currentVolume = 50;
-            let currentVideoId = null;
-            let isPlaying = false;
-
-            async function getStreamUrlPiped(videoId) {
-                for (const instance of PIPED_INSTANCES) {
-                    try {
-                        const resp = await fetch(instance + '/streams/' + videoId);
-                        if (!resp.ok) continue;
-                        const data = await resp.json();
-
-                        if (data.videoStreams && data.videoStreams.length > 0) {
-                            const combined = data.videoStreams
-                                .filter(s => s.videoOnly === false)
-                                .sort((a, b) => (b.quality || '').localeCompare(a.quality || ''));
-
-                            if (combined.length > 0) {
-                                return { url: combined[0].url, title: data.title, method: 'piped' };
-                            }
+        function onYouTubeIframeAPIReady() {
+            if (videoId) {
+                videohandler = new YT.Player("videoframe", {
+                    videoId: videoId,
+                    playerVars: {
+                        'autoplay': 1,
+                        'controls': 0,
+                        'disablekb': 1,
+                        'fs': 0,
+                        'rel': 0,
+                        'modestbranding': 1,
+                        'iv_load_policy': 3
+                    },
+                    events: {
+                        'onReady': function(event) {
+                            event.target.setVolume(50);
+                            event.target.playVideo();
                         }
-
-                        if (data.hls) {
-                            return { url: data.hls, title: data.title, method: 'piped-hls' };
-                        }
-                    } catch (e) {
-                        console.warn('[TV] Piped instance failed:', instance, e);
                     }
-                }
-                return null;
+                });
             }
+        }
 
-            async function getStreamUrlInvidious(videoId) {
-                for (const instance of INVIDIOUS_INSTANCES) {
-                    try {
-                        const resp = await fetch(instance + '/api/v1/videos/' + videoId + '?fields=title,formatStreams,adaptiveFormats');
-                        if (!resp.ok) continue;
-                        const data = await resp.json();
+        window.addEventListener('message', function (event) {
+            var item = event.data;
 
-                        if (data.formatStreams && data.formatStreams.length > 0) {
-                            const best = data.formatStreams
-                                .sort((a, b) => parseInt(b.qualityLabel) - parseInt(a.qualityLabel));
-                            return { url: best[0].url, title: data.title, method: 'invidious' };
-                        }
-                    } catch (e) {
-                        console.warn('[TV] Invidious instance failed:', instance, e);
-                    }
-                }
-                return null;
-            }
-
-            function playYouTubeEmbed(videoId) {
-                videoPlayer.style.display = 'none';
-                videoPlayer.src = '';
-                ytIframe.style.display = 'block';
-                status.style.display = 'none';
-
-                ytIframe.src = 'https://www.youtube-nocookie.com/embed/' + videoId
-                    + '?autoplay=1&controls=0&disablekb=1&modestbranding=1'
-                    + '&rel=0&iv_load_policy=3&fs=0&playsinline=1'
-                    + '&enablejsapi=0&origin=' + encodeURIComponent(window.location.origin);
-
-                console.log('[TV] Fallback: YouTube embed für', videoId);
-            }
-
-            async function playVideo(videoId, title) {
-                if (!videoId) return;
-                currentVideoId = videoId;
-                isPlaying = true;
-
-                status.style.display = 'block';
-                status.textContent = 'Lade Video...';
-                videoPlayer.style.display = 'none';
-                ytIframe.style.display = 'none';
-
-                let streamData = await getStreamUrlPiped(videoId);
-
-                if (!streamData) {
-                    console.log('[TV] Piped fehlgeschlagen, versuche Invidious...');
-                    streamData = await getStreamUrlInvidious(videoId);
-                }
-
-                if (streamData && streamData.url) {
-                    console.log('[TV] Werbefreier Stream via', streamData.method, ':', streamData.url.substring(0, 80));
-                    ytIframe.style.display = 'none';
-                    videoPlayer.style.display = 'block';
-                    status.style.display = 'none';
-
-                    videoPlayer.src = streamData.url;
-                    videoPlayer.volume = currentVolume / 100;
-                    videoPlayer.play().catch(function(e) {
-                        console.warn('[TV] Video play failed, falling back to embed:', e);
-                        playYouTubeEmbed(videoId);
-                    });
-
-                    videoPlayer.onerror = function() {
-                        console.warn('[TV] Stream error, falling back to embed');
-                        playYouTubeEmbed(videoId);
-                    };
-
+            if (typeof item === 'string') {
+                try {
+                    item = JSON.parse(item);
+                } catch (e) {
                     return;
                 }
-
-                console.log('[TV] Kein werbefreier Stream gefunden, nutze YouTube Embed');
-                playYouTubeEmbed(videoId);
             }
 
-            function stopVideo() {
-                isPlaying = false;
-                currentVideoId = null;
-
-                videoPlayer.pause();
-                videoPlayer.src = '';
-                videoPlayer.style.display = 'none';
-
-                ytIframe.src = '';
-                ytIframe.style.display = 'none';
-
-                status.style.display = 'block';
-                status.textContent = 'Kein Video';
+            if (item.message === "updatevolume" && videohandler && typeof videohandler.setVolume === 'function') {
+                videohandler.setVolume(item.videovolume);
             }
-
-            function setVolume(vol) {
-                currentVolume = Math.max(0, Math.min(100, vol));
-                videoPlayer.volume = currentVolume / 100;
-            }
-
-            window.addEventListener('message', function(event) {
-                var data = event.data;
-                if (!data || !data.type) return;
-
-                switch (data.type) {
-                    case 'play':
-                        playVideo(data.videoId, data.title);
-                        break;
-
-                    case 'stop':
-                        stopVideo();
-                        break;
-
-                    case 'setVolume':
-                    case 'volume':
-                        setVolume(data.volume);
-                        break;
-
-                    case 'setPreferredMethod':
-                        preferredMethod = data.method || 'piped';
-                        break;
-                }
-            });
-
-            status.style.display = 'block';
-            console.log('[TV Wrapper] Initialisiert – werbefrei via Piped/Invidious mit YouTube-Fallback');
-        })();
+        });
     </script>
 </body>
 </html>
