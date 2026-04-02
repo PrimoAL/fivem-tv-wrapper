@@ -1,99 +1,51 @@
 <!DOCTYPE html>
-<html>
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>FiveM TV</title>
+    <title>Astro TV</title>
+    <script src="https://www.youtube.com/iframe_api"></script>
     <style>
-        * { margin: 0; padding: 0; overflow: hidden; }
-        html, body { width: 100%; height: 100%; background: #000; }
-        #player { width: 100%; height: 100%; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: black; overflow: hidden; }
+        #videoframe { width: 100%; height: 100%; pointer-events: none; border: none; }
     </style>
 </head>
 <body>
-    <div id="player"></div>
+    <div id="videoframe"></div>
 
     <script>
-        var params = new URLSearchParams(window.location.search);
-        var videoId = params.get('v') || '';
-        var startTime = parseInt(params.get('t')) || 0;
-        var adSkipped = false;
-        var player;
-
-        if (videoId) {
-            var tag = document.createElement('script');
-            tag.src = 'https://www.youtube.com/iframe_api';
-            var first = document.getElementsByTagName('script')[0];
-            first.parentNode.insertBefore(tag, first);
-        }
+        var videohandler = null;
+        const urlParams = new URLSearchParams(window.location.search);
+        const videoId = urlParams.get('v');
 
         function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                width: '100%',
-                height: '100%',
-                videoId: videoId,
-                playerVars: {
-                    autoplay: 1,
-                    controls: 0,
-                    disablekb: 1,
-                    enablejsapi: 1,
-                    fs: 0,
-                    iv_load_policy: 3,
-                    modestbranding: 1,
-                    rel: 0,
-                    showinfo: 0,
-                    playsinline: 1
-                },
-                events: {
-                    onReady: onPlayerReady,
-                    onStateChange: onPlayerStateChange,
-                    onError: onPlayerError
-                }
-            });
-        }
-
-        function onPlayerReady(event) {
-            var duration = player.getDuration();
-            if (duration > 0) {
-                player.setVolume(0);
-                player.seekTo(duration - 0.5);
-                player.playVideo();
-                console.log('[Astro TV] Ad-Skip: Spule ans Ende (' + duration + 's)');
-            } else {
-                player.setVolume(100);
-                player.playVideo();
-                adSkipped = true;
+            if (videoId) {
+                videohandler = new YT.Player("videoframe", {
+                    videoId: videoId,
+                    playerVars: {
+                        'autoplay': 1,
+                        'controls': 0,
+                        'disablekb': 1,
+                        'fs': 0,
+                        'rel': 0,
+                        'modestbranding': 1,
+                        'iv_load_policy': 3
+                    },
+                    events: {
+                        'onReady': function(event) {
+                            event.target.setVolume(50); 
+                            event.target.playVideo();
+                        }
+                    }
+                });
             }
         }
 
-        function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.ENDED && !adSkipped) {
-                adSkipped = true;
-                player.setVolume(100);
-                player.seekTo(startTime);
-                player.playVideo();
-                console.log('[Astro TV] Ad-Skip abgeschlossen, starte Video bei ' + startTime + 's');
+        window.addEventListener('message', function (event) {
+            var item = event.data;
+            if (item.message === "updatevolume" && videohandler && typeof videohandler.setVolume === 'function') {
+                videohandler.setVolume(item.videovolume);
             }
-            
-            if (event.data === YT.PlayerState.ENDED && adSkipped) {
-                player.seekTo(0);
-                player.playVideo();
-                console.log('[Astro TV] Video Loop');
-            }
-
-            if (event.data === YT.PlayerState.PAUSED && !adSkipped) {
-                player.playVideo();
-            }
-        }
-
-        function onPlayerError(event) {
-            console.log('[Astro TV] Player Error: ' + event.data);
-            if (player) {
-                adSkipped = true;
-                player.setVolume(100);
-                player.seekTo(startTime);
-                player.playVideo();
-            }
-        }
+        });
     </script>
 </body>
 </html>
