@@ -32,7 +32,7 @@
                     },
                     events: {
                         'onReady': function(event) {
-                            event.target.setVolume(50); 
+                            event.target.setVolume(50);
                             event.target.playVideo();
                         }
                     }
@@ -42,6 +42,15 @@
 
         window.addEventListener('message', function (event) {
             var item = event.data;
+
+            if (typeof item === 'string') {
+                try {
+                    item = JSON.parse(item);
+                } catch (e) {
+                    return;
+                }
+            }
+
             if (item.message === "updatevolume" && videohandler && typeof videohandler.setVolume === 'function') {
                 videohandler.setVolume(item.videovolume);
             }
